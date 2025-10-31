@@ -1,0 +1,485 @@
+[FormDesignerId("024F0332-296E-4EE8-9557-5AC54D181030")]
+[ClassId("FEBB48E0-90EF-42C4-858E-6A538040D7B7")]
+[InterfaceId("FFC40BA3-7428-4529-8EB9-1AED367F586D")]
+[EventInterfaceId("962F7A53-EBAD-48AA-A8DC-C29CAE8CAD99")]
+Class Form1
+    Attribute VB_Name = "Form1"
+    Attribute VB_GlobalNameSpace = False
+    Attribute VB_Creatable = False
+    Attribute VB_PredeclaredId = True
+    Attribute VB_Exposed = False
+    Option Explicit
+    Private cVolCallback As cAudioEndpointVolumeCallback
+    Private mDefRenderMM As IMMDevice
+    Private mDefRenderMMVol As IAudioEndpointVolume
+    Private mDeviceEnum As MMDeviceEnumerator
+    Private pEPVolMM As IAudioEndpointVolume
+    
+    Public Sub AppendMsg(sMsg As String)
+    Text1.Text = Text1.Text & vbCrLf & sMsg
+    End Sub
+    Private Sub Command1_Click()
+    Dim sOut As String
+    Dim i As Long
+    Dim lp As Long
+    Dim s1 As String
+    
+    Dim pDvEnum As MMDeviceEnumerator
+    Set pDvEnum = New MMDeviceEnumerator
+    
+    Dim pDvCol As IMMDeviceCollection
+    
+    pDvEnum.EnumAudioEndpoints eCapture, IIf(Option1(0).Value = True, DEVICE_STATE_ACTIVE, DEVICE_STATEMASK_ALL), pDvCol
+    
+    If (pDvCol Is Nothing) = False Then
+        Dim nCount As Long
+        
+        If pDvCol.GetCount(nCount) = S_OK Then
+            For i = 0 To (nCount - 1)
+                sOut = sOut & "Capture Device(" & i & ")=" & GetDeviceName(pDvCol, i) & vbCrLf
+            Next
+            Text1.Text = sOut
+        Else
+            Debug.Print "Failed to get device count."
+        End If
+    Else
+        Debug.Print "Failed to enum endpoints."
+    End If
+        
+    
+    End Sub
+    
+    Private Function GetDeviceName(pCol As IMMDeviceCollection, nIdx As Long) As String
+    Dim pDevice As IMMDevice
+    Dim sID As String
+    Dim pStore As IPropertyStore
+    Dim pDesc As IPropertyDescription
+    Dim lp As Long
+    Dim lpID As LongPtr
+    Dim vrProp As Variant
+    Dim vProp As Variant
+    Dim j As Long
+    If (pCol.Item(nIdx, pDevice)) = S_OK Then
+        pDevice.GetId lpID
+        sID = LPWSTRtoStr(lpID)
+        Debug.Print "Got device(" & nIdx & ") id=" & sID
+        If (sID = "") Or (sID = vbNullChar) Then
+            Debug.Print "Invalid DeviceID"
+            Exit Function
+        End If
+        pDevice.OpenPropertyStore STGM_READ, pStore
+        If (pStore Is Nothing) = False Then
+            'these property stores aren't as full-featured as other ones
+            'such as those associated with IShellItem's of files.. for
+            'example we can't use the superior PSFormatPropertyValue b/c
+            'we can't get an IPropertyDescription, or a property name
+            'So we're stuck using PropVariants, a nightmare in VB
+            Dim pcnt As Long
+            pStore.GetCount pcnt
+            Debug.Print "prop cnt=" & pcnt
+            Debug.Print "outputting propvariant..."
+            Dim pk As PROPERTYKEY
+            pStore.GetValue PKEY_Device_FriendlyName, vProp
+            PropVariantToVariant vProp, vrProp
+            Dim vte As VbVarType
+            vte = VarType(vrProp)
+            If (vte And vbArray) = vbArray Then 'this always seems to be vbString and vbArray, haven't encountered other types
+                Debug.Print "PV type is array"
+                For j = LBound(vrProp) To UBound(vrProp)
+                    Debug.Print "Value(" & j & ")=" & CStr(vrProp(j))
+                Next j
+    
+            Else
+                Select Case vte
+                    Case vbDataObject, vbObject, vbUserDefinedType
+                        GetDeviceName = "<cannot display this type>"
+                    Case vbEmpty, vbNull
+                        GetDeviceName = "<empty or null>"
+                    Case vbError
+                        GetDeviceName = "<vbError>"
+                    Case Else
+                        GetDeviceName = CStr(vrProp)
+                End Select
+            End If
+    '        Debug.Print "enum pstore..."
+    '        dbg_enumstore pStore
+        Else
+            Debug.Print "Failed to get IPropertyStore"
+        End If
+    Else
+        Debug.Print "Failed to get device with pCol.Item, nIdx=" & nIdx
+    End If
+    
+    End Function
+    Private Function GetDeviceNameDirect(pDevice As IMMDevice) As String
+    Dim sID As String
+    Dim pStore As IPropertyStore
+    Dim pDesc As IPropertyDescription
+    Dim lp As Long
+    Dim lpID As LongPtr
+    Dim vrProp As Variant
+    Dim vProp As Variant
+    Dim j As Long
+        pDevice.GetId lpID
+        sID = LPWSTRtoStr(lpID)
+        Debug.Print "Got device id=" & sID
+        If (sID = "") Or (sID = vbNullChar) Then
+            Debug.Print "Invalid DeviceID"
+            Exit Function
+        End If
+        pDevice.OpenPropertyStore STGM_READ, pStore
+        If (pStore Is Nothing) = False Then
+            'these property stores aren't as full-featured as other ones
+            'such as those associated with IShellItem's of files.. for
+            'example we can't use the superior PSFormatPropertyValue b/c
+            'we can't get an IPropertyDescription, or a property name
+            'So we're stuck using PropVariants, a nightmare in VB
+            Dim pcnt As Long
+            pStore.GetCount pcnt
+            Debug.Print "prop cnt=" & pcnt
+            Debug.Print "outputting propvariant..."
+            Dim pk As PROPERTYKEY
+            pStore.GetValue PKEY_Device_FriendlyName, vProp
+            PropVariantToVariant vProp, vrProp
+            Dim vte As VbVarType
+            vte = VarType(vrProp)
+            If (vte And vbArray) = vbArray Then 'this always seems to be vbString and vbArray, haven't encountered other types
+                Debug.Print "PV type is array"
+                For j = LBound(vrProp) To UBound(vrProp)
+                    Debug.Print "Value(" & j & ")=" & CStr(vrProp(j))
+                Next j
+    
+            Else
+                Select Case vte
+                    Case vbDataObject, vbObject, vbUserDefinedType
+                        GetDeviceNameDirect = "<cannot display this type>"
+                    Case vbEmpty, vbNull
+                        GetDeviceNameDirect = "<empty or null>"
+                    Case vbError
+                        GetDeviceNameDirect = "<vbError>"
+                    Case Else
+                        GetDeviceNameDirect = CStr(vrProp)
+                End Select
+            End If
+    '        Debug.Print "enum pstore..."
+    '        dbg_enumstore pStore
+        Else
+            Debug.Print "Failed to get IPropertyStore"
+        End If
+    
+    
+    End Function
+    Private Sub Command2_Click()
+    Dim sOut As String
+    Dim i As Long
+    Dim lp As Long
+    Dim s1 As String
+    Dim sName As String
+    
+    Dim pDvEnum As MMDeviceEnumerator
+    Set pDvEnum = New MMDeviceEnumerator
+    
+    Dim pDvCol As IMMDeviceCollection
+    
+    pDvEnum.EnumAudioEndpoints eCapture, DEVICE_STATE_ACTIVE, pDvCol
+    
+    If (pDvCol Is Nothing) = False Then
+        Dim nCount As Long
+        Dim pDevice As IMMDevice
+        Dim WTFVAR As Variant
+        If pDvCol.GetCount(nCount) = S_OK Then
+            If nCount > 0 Then
+                For i = 0 To (nCount - 1)
+                    sName = GetDeviceName(pDvCol, i)
+                    sOut = sOut & "Muting Device(" & i & ", Name=" & sName & ")..." & vbCrLf
+                    pDvCol.Item i, pDevice
+                    If (pDevice Is Nothing) = False Then
+                        Dim pAEV As IAudioEndpointVolume
+                        pDevice.Activate IID_IAudioEndpointVolume, CLSCTX_INPROC_SERVER, CVar(0), pAEV
+                        If (pAEV Is Nothing) = False Then
+                            If pAEV.SetMute(1, UUID_NULL) = S_OK Then
+                                sOut = sOut & "...Device successfully muted!" & vbCrLf
+                            Else
+                                sOut = sOut & "...Failed to mute device " & i & " (" & sName & "). Already muted?" & vbCrLf
+                            End If
+                        Else
+                            Debug.Print "Failed to set pAEV"
+                            sOut = sOut & "...An error occured accessing the volume control." & vbCrLf
+                        End If
+                    Else
+                        Debug.Print "Failed to set pDevice"
+                        sOut = sOut & "...Failed to get pointer to device." & vbCrLf
+                    End If
+                Next
+            Else
+                sOut = "No active devices found." & vbCrLf
+            End If
+        Else
+            Debug.Print "Failed to get device count."
+            sOut = sOut & "An error occured getting the device count." & vbCrLf
+        End If
+    Else
+        Debug.Print "Failed to set pDvCol"
+        sOut = "Failed to get device collection (no active devices or an error occured)"
+    End If
+    Text1.Text = sOut
+    End Sub
+    
+    Private Sub Command3_Click()
+    Dim sOut As String
+    Dim i As Long
+    Dim lp As Long
+    Dim s1 As String
+    
+    Dim pDvEnum As MMDeviceEnumerator
+    Set pDvEnum = New MMDeviceEnumerator
+    
+    Dim pDvCol As IMMDeviceCollection
+    
+    pDvEnum.EnumAudioEndpoints eRender, IIf(Option2(0).Value = True, DEVICE_STATE_ACTIVE, DEVICE_STATEMASK_ALL), pDvCol
+    
+    If (pDvCol Is Nothing) = False Then
+        Dim nCount As Long
+        
+        If pDvCol.GetCount(nCount) = S_OK Then
+            For i = 0 To (nCount - 1)
+                sOut = sOut & "Render Device(" & i & ")=" & GetDeviceName(pDvCol, i) & vbCrLf
+            Next
+            Text1.Text = sOut
+        Else
+            Debug.Print "Failed to get device count."
+        End If
+    Else
+        Debug.Print "Failed to enum endpoints."
+    End If
+    
+    End Sub
+    
+    Private Sub Command4_Click()
+    Dim sOut As String
+    Dim i As Long
+    Dim lp As Long
+    Dim s1 As String
+    
+    Dim pDvEnum As MMDeviceEnumerator
+    Set pDvEnum = New MMDeviceEnumerator
+    
+    Dim pDvCol As IMMDeviceCollection
+    
+    pDvEnum.EnumAudioEndpoints eAll, DEVICE_STATEMASK_ALL, pDvCol
+    
+    If (pDvCol Is Nothing) = False Then
+        Dim nCount As Long
+        Dim pDev As IMMDevice
+        Dim sStatus As String
+        Dim nStatus As DEVICE_STATE
+        
+        If pDvCol.GetCount(nCount) = S_OK Then
+            For i = 0 To (nCount - 1)
+                pDvCol.Item i, pDev
+                If (pDev Is Nothing) = False Then
+                    pDev.GetState nStatus
+                    sStatus = GetStatusStr(nStatus)
+                    sOut = sOut & "(" & sStatus & ") "
+                End If
+                sOut = sOut & "Device " & i & ": " & GetDeviceName(pDvCol, i) & vbCrLf
+            Next
+            Text1.Text = sOut
+        Else
+            Debug.Print "Failed to get device count."
+        End If
+    Else
+        Debug.Print "Failed to enum endpoints."
+    End If
+    End Sub
+    Private Function GetStatusStr(lStatus As DEVICE_STATE) As String
+    Select Case lStatus
+    
+        Case DEVICE_STATE_ACTIVE: GetStatusStr = "active"
+        Case DEVICE_STATE_DISABLED: GetStatusStr = "disabled"
+        Case DEVICE_STATE_NOTPRESENT: GetStatusStr = "not present"
+        Case DEVICE_STATE_UNPLUGGED: GetStatusStr = "unplugged"
+        Case Else: GetStatusStr = "<invalid>"
+        
+    
+    End Select
+    End Function
+    
+    Private Sub Command5_Click()
+    Dim sOut As String
+    Dim i As Long
+    Dim lp As Long
+    Dim s1 As String
+    
+    Dim pDvEnum As MMDeviceEnumerator
+    Set pDvEnum = New MMDeviceEnumerator
+    Dim pDvDefault As IMMDevice
+    
+    pDvEnum.GetDefaultAudioEndpoint eCapture, eConsole, pDvDefault
+    
+    If (pDvDefault Is Nothing) = False Then
+        sOut = "Default capture device: " & GetDeviceNameDirect(pDvDefault) & vbCrLf
+        Set pDvDefault = Nothing
+        pDvEnum.GetDefaultAudioEndpoint eCapture, eMultimedia, pDvDefault
+        If (pDvDefault Is Nothing) = False Then
+            sOut = sOut & "Default capture device (multimedia): " & GetDeviceNameDirect(pDvDefault) & vbCrLf
+            Set pDvDefault = Nothing
+        End If
+        pDvEnum.GetDefaultAudioEndpoint eCapture, eCommunications, pDvDefault
+        If (pDvDefault Is Nothing) = False Then
+            sOut = sOut & "Default capture device (communications): " & GetDeviceNameDirect(pDvDefault) & vbCrLf
+            Set pDvDefault = Nothing
+        End If
+    Else
+        sOut = "Default capture device: (none found)" & vbCrLf
+    End If
+    
+    pDvEnum.GetDefaultAudioEndpoint eRender, eConsole, pDvDefault
+    
+    If (pDvDefault Is Nothing) = False Then
+        sOut = sOut & "Default render device (console): " & GetDeviceNameDirect(pDvDefault) & vbCrLf
+        Set pDvDefault = Nothing
+        pDvEnum.GetDefaultAudioEndpoint eRender, eMultimedia, pDvDefault
+        If (pDvDefault Is Nothing) = False Then
+            sOut = sOut & "Default render device (multimedia): " & GetDeviceNameDirect(pDvDefault) & vbCrLf
+            Set pDvDefault = Nothing
+        End If
+        pDvEnum.GetDefaultAudioEndpoint eRender, eCommunications, pDvDefault
+        If (pDvDefault Is Nothing) = False Then
+            sOut = sOut & "Default render device (communications): " & GetDeviceNameDirect(pDvDefault) & vbCrLf
+            Set pDvDefault = Nothing
+        End If
+        
+    Else
+        sOut = "Default render device: (none found)" & vbCrLf
+    End If
+    
+    Text1.Text = sOut
+    End Sub
+    
+    Private Sub Command6_Click()
+    Dim sOut As String
+    Dim i As Long
+    Dim lp As LongPtr
+    Dim s1 As String
+    
+    Dim pDvEnum As MMDeviceEnumerator
+    Set pDvEnum = New MMDeviceEnumerator
+    Dim pDvDefault As IMMDevice
+    
+    Dim pSVol As ISimpleAudioVolume
+    Dim pASM As IAudioSessionManager2
+    
+    pDvEnum.GetDefaultAudioEndpoint eRender, eMultimedia, pDvDefault
+    
+    If (pDvDefault Is Nothing) = False Then
+        pDvDefault.Activate IID_IAudioSessionManager2, 0, CVar(0), pASM
+        Dim pSessionEnum As IAudioSessionEnumerator
+        Set pSessionEnum = pASM.GetSessionEnumerator()
+        Dim nsCnt As Long
+        If (pSessionEnum Is Nothing) = False Then
+            pSessionEnum.GetCount nsCnt
+            Dim pCtl As IAudioSessionControl
+            Dim pCtl2 As IAudioSessionControl2
+            For i = 0 To (nsCnt - 1)
+                pSessionEnum.GetSession i, pCtl
+                If (pCtl Is Nothing) = False Then
+                    pCtl.GetDisplayName lp
+                    'pCtl.GetIconPath lp
+                    s1 = LPWSTRtoStr(lp)
+                    Debug.Print "mutable app=" & s1
+                    lp = 0
+                    Set pCtl2 = pCtl
+                    pCtl2.GetSessionIdentifier lp
+                    Debug.Print "Identifier=" & LPWSTRtoStr(lp)
+                    Debug.Print "IsSys=" & pCtl2.IsSystemSoundsSession
+                    If LCase$(s1) = LCase$(Text2.Text) Then 'found app we want to mute
+                        Set pSVol = pCtl
+                        If pSVol.SetMute(1, UUID_NULL) = S_OK Then
+                            sOut = "Successfully muted " & Text2.Text
+                        Else
+                            sOut = "Mute function failed on " & Text2.Text
+                        End If
+                    End If
+                End If
+            Next
+        Else
+            sOut = "Failed to get session enumeration."
+        End If
+    Else
+        sOut = "Failed to get default render device."
+    End If
+    
+    Text1.Text = sOut
+    End Sub
+    
+    Private Sub Command7_Click()
+    Dim sOut As String
+    Dim i As Long
+    Dim lp As Long
+    Dim s1 As String
+    
+    Dim pDvEnum As MMDeviceEnumerator
+    Set pDvEnum = New MMDeviceEnumerator
+    Dim pDvDefault As IMMDevice
+    
+    Dim pSVol As ISimpleAudioVolume
+    Dim pASM As IAudioSessionManager2
+    
+    pDvEnum.GetDefaultAudioEndpoint eRender, eMultimedia, pDvDefault
+    
+    If (pDvDefault Is Nothing) = False Then
+        pDvDefault.Activate IID_IAudioSessionManager2, 0, CVar(0), pASM
+        Dim pVol As ISimpleAudioVolume
+        pASM.GetSimpleAudioVolume UUID_NULL, 0&, pVol
+        If (pVol Is Nothing) = False Then
+            If pVol.SetMute(1, UUID_NULL) = S_OK Then
+                sOut = "Muted " & GetDeviceNameDirect(pDvDefault)
+            End If
+        End If
+    End If
+            Text1.Text = sOut
+    End Sub
+    
+    Private Sub Command8_Click()
+    Dim sOut As String
+    
+    
+    Set mDeviceEnum = New MMDeviceEnumerator
+    
+    mDeviceEnum.GetDefaultAudioEndpoint eRender, eMultimedia, mDefRenderMM
+    
+    If (mDefRenderMM Is Nothing) = False Then
+        
+        mDefRenderMM.Activate IID_IAudioEndpointVolume, CLSCTX_INPROC_SERVER, CVar(0), pEPVolMM
+        If (pEPVolMM Is Nothing) = False Then
+            If (cVolCallback Is Nothing) Then
+                Set cVolCallback = New cAudioEndpointVolumeCallback
+                pEPVolMM.RegisterControlChangeNotify cVolCallback
+                sOut = "Callback registered. Unmuting in Explorer or elsewhere will notify this app too."
+            End If
+            If pEPVolMM.SetMute(1, UUID_NULL) = S_OK Then
+                sOut = "Muted " & GetDeviceNameDirect(mDefRenderMM)
+            Else
+                sOut = "Mute op failed on " & GetDeviceNameDirect(mDefRenderMM)
+            End If
+        Else
+            sOut = "Couldn't get endpoint volume control."
+        End If
+    Else
+        sOut = "Couldn't get default endpoint device."
+    End If
+    
+    Text1.Text = Text1.Text & vbCrLf & sOut & vbCrLf
+    End Sub
+    
+    
+    
+    Private Sub Form_Resize()
+    On Error Resume Next
+    Text1.Width = Form1.Width - 366
+    Text1.Height = Form1.Height - 4140
+    End Sub
+    
+
+End Class
